@@ -6,6 +6,7 @@ import { FiFilter, FiCalendar, FiUsers, FiUser, FiChevronLeft, FiChevronRight } 
 import ReactPaginate from 'react-paginate';
 import { FaDownload, FaFileExcel } from 'react-icons/fa';
 import * as XLSX from 'xlsx';
+import LogOutButton from '../../../components/LogoutButton';
 
 const TeamReport = () => {
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
@@ -151,9 +152,9 @@ const TeamReport = () => {
     XLSX.writeFile(wb, fileName);
   }
 
-const handlePrint = () => {
-  // Create a printable HTML string with compact styling
-  const printContent = `
+  const handlePrint = () => {
+    // Create a printable HTML string with compact styling
+    const printContent = `
     <html>
       <head>
         <title>Team Movement Report</title>
@@ -281,25 +282,28 @@ const handlePrint = () => {
     </html>
   `;
 
-  // Open print window
-  const printWindow = window.open('', '_blank');
-  printWindow.document.open();
-  printWindow.document.write(printContent);
-  printWindow.document.close();
+    // Open print window
+    const printWindow = window.open('', '_blank');
+    printWindow.document.open();
+    printWindow.document.write(printContent);
+    printWindow.document.close();
 
-  // Wait for content to load before printing
-  printWindow.onload = function () {
-    setTimeout(() => {
-      printWindow.focus();
-      printWindow.print();
-      printWindow.close();
-    }, 300);
-  };
-}
+    // Wait for content to load before printing
+    printWindow.onload = function () {
+      setTimeout(() => {
+        printWindow.focus();
+        printWindow.print();
+        printWindow.close();
+      }, 300);
+    };
+  }
 
   return (
     <div className="max-w-6xl mx-auto p-4">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Team Movement Reports</h1>
+      <div className='flex justify-between items-center p-4'>
+        <h1 className="text-2xl font-bold text-gray-800">Team Movement Reports</h1>
+        <LogOutButton />
+      </div>
 
       <div className="space-y-4 bg-white p-6 rounded-lg shadow-md border border-gray-200">
         <div className="flex items-center text-gray-700 mb-4">
