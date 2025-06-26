@@ -22,6 +22,7 @@ const UploadReportUser = () => {
     remark: '',
   });
 
+  const [location, setLocation] = useState({ latitude: null, longitude: null });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [visitingStatuses, setVisitingStatuses] = useState([]);
   const [partyNames, setPartyNames] = useState([]);
@@ -96,35 +97,57 @@ const UploadReportUser = () => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    try {
-      const res = await axios.post(`${baseUrl}/movements`, formData);
-
-      if (res.status === 201) {
-        toast.success('Movement recorded successfully!', {
-          position: "top-right",
-          className: 'bg-green-100 text-green-800 border border-green-200'
-        });
-        setFormData(prev => ({
-          ...prev,
-          punchTime: '',
-          punchingTime: '',
-          visitingStatus: '',
-          placeName: '',
-          partyName: '',
-          purpose: '',
-          remark: '',
-        }));
-      }
-    } catch (error) {
-      console.error('Submit error:', error);
-      toast.error(error.response?.data?.message || 'Submission failed', {
-        position: "top-right",
-        className: 'bg-red-100 text-red-800 border border-red-200'
-      });
-    } finally {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by your browser');
       setIsSubmitting(false);
+      return;
     }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+
+        try {
+          const res = await axios.post(`${baseUrl}/movements`, {
+            ...formData,
+            latitude,
+            longitude
+          });
+
+          if (res.status === 201) {
+            toast.success('Movement recorded successfully!', {
+              position: "top-right",
+              className: 'bg-green-100 text-green-800 border border-green-200'
+            });
+            setFormData(prev => ({
+              ...prev,
+              punchTime: '',
+              punchingTime: '',
+              visitingStatus: '',
+              placeName: '',
+              partyName: '',
+              purpose: '',
+              remark: '',
+            }));
+          }
+        } catch (error) {
+          console.error('Submit error:', error);
+          toast.error(error.response?.data?.message || 'Submission failed', {
+            position: "top-right",
+            className: 'bg-red-100 text-red-800 border border-red-200'
+          });
+        } finally {
+          setIsSubmitting(false);
+        }
+      },
+      (error) => {
+        toast.error('Unable to get location');
+        console.error(error);
+        setIsSubmitting(false);
+      }
+    );
   };
+
 
   if (!user) return (
     <div className="flex items-center justify-center h-screen">
@@ -335,7 +358,7 @@ const UploadReportUser = () => {
           </div>
         </div>
 
-        <ToastContainer 
+        <ToastContainer
           position="top-right"
           autoClose={5000}
           hideProgressBar={false}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaBars, FaTimes, FaSearch, FaFilter, FaCalendarAlt, FaSort, FaPrint, FaFileDownload } from 'react-icons/fa';
+import { FaBars, FaTimes, FaSearch, FaFilter, FaCalendarAlt, FaSort, FaPrint, FaFileDownload, FaMapMarkerAlt } from 'react-icons/fa';
 import { MdFirstPage, MdLastPage, MdChevronLeft, MdChevronRight } from 'react-icons/md';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -23,6 +23,8 @@ const MovementReports = () => {
   const [users, setUsers] = useState([]);
   const [filtersApplied, setFiltersApplied] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: 'dateTime', direction: 'desc' });
+  const [showMapModal, setShowMapModal] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState({ lat: 0, lng: 0 });
 
   const fetchMovementReports = async () => {
     setIsLoading(true);
@@ -188,6 +190,14 @@ const MovementReports = () => {
     );
   };
 
+  const viewLocationOnMap = (lat, lng) => {
+    if (!lat || !lng) {
+      toast.warning('No location data available for this record');
+      return;
+    }
+    setCurrentLocation({ lat: parseFloat(lat), lng: parseFloat(lng) });
+    setShowMapModal(true);
+  };
 
   const downloadCSV = () => {
     if (filteredData.length === 0) {
@@ -214,7 +224,7 @@ const MovementReports = () => {
       report.visitingStatus,
       report.placeName || 'N/A',
       report.partyName || 'N/A',
-      report.purpose || 'Not specified'
+      report.purpose || 'Not specified',
     ]);
 
     const csvContent = [
@@ -255,6 +265,8 @@ const MovementReports = () => {
         <td class="py-1">${report.placeName || 'N/A'}</td>
         <td class="py-1">${report.partyName || 'N/A'}</td>
         <td class="py-1">${report.purpose || 'Not specified'}</td>
+        <td class="py-1">${report.latitude || 'N/A'}</td>
+        <td class="py-1">${report.longitude || 'N/A'}</td>
       </tr>
     `).join('');
 
@@ -307,6 +319,8 @@ const MovementReports = () => {
                 <th>Place</th>
                 <th>Party</th>
                 <th>Purpose</th>
+                <th>Latitude</th>
+                <th>Longitude</th>
               </tr>
             </thead>
             <tbody>
@@ -547,6 +561,9 @@ const MovementReports = () => {
                       <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Purpose
                       </th>
+                      <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Location
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -576,11 +593,186 @@ const MovementReports = () => {
                         <td className="px-4 py-2 text-xs text-gray-500">
                           {report.purpose || 'Not specified'}
                         </td>
+                        <td className="px-4 py-2 whitespace-nowrap text-xs text-gray-500">
+                          {report.latitude && report.longitude ? (
+                            <button
+                              onClick={() => viewLocationOnMap(report.latitude, report.longitude)}
+                              className="text-blue-600 hover:text-blue-800 flex items-center"
+                              title="View on map"
+                            >
+                              <FaMapMarkerAlt className="mr-1" />
+                              View
+                            </button>
+                          ) : (
+                            'N/A'
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+
+              {/* Map Modal */}
+              {showMapModal && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                  <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col overflow-hidden border border-gray-200">
+                    <div className="flex justify-between items-center bg-gradient-to-r from-blue-600 to-blue-800 p-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-white">Location Details</h3>
+                        <p className="text-xs text-blue-100 mt-1">
+                          {currentLocation.lat}, {currentLocation.lng}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setShowMapModal(false)}
+                        className="text-white hover:text-blue-200 transition-colors p-1 rounded-full hover:bg-white/10"
+                        aria-label="Close modal"
+                      >
+                        <FaTimes className="h-5 w-5" />
+                      </button>
+                    </div>
+
+                    <div className="flex flex-col md:flex-row flex-grow overflow-hidden">
+                      {/* Map Section */}
+                      <div className="w-full md:w-2/3 h-64 md:h-full relative">
+                        <div className="absolute inset-0 bg-gray-100 flex items-center justify-center">
+                          <div className="animate-pulse text-gray-400">
+                            <FaMapMarkerAlt className="h-8 w-8" />
+                            <p className="text-sm mt-2">Loading map...</p>
+                          </div>
+                        </div>
+                        <iframe
+                          width="100%"
+                          height="100%"
+                          className="absolute inset-0"
+                          frameBorder="0"
+                          style={{ border: 0 }}
+                          src={`https://maps.google.com/maps?q=${currentLocation.lat},${currentLocation.lng}&z=16&output=embed&hl=en`}
+                          allowFullScreen
+                          loading="lazy"
+                        ></iframe>
+
+                        {/* Map Controls */}
+                        <div className="absolute bottom-4 right-4 flex flex-col space-y-2">
+                          <a
+                            href={`https://www.google.com/maps/dir/?api=1&destination=${currentLocation.lat},${currentLocation.lng}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-white p-2 rounded-full shadow-md hover:bg-blue-50 transition-colors"
+                            title="Get directions"
+                          >
+                            <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clipRule="evenodd" />
+                            </svg>
+                          </a>
+                          <a
+                            href={`https://www.google.com/maps?q=${currentLocation.lat},${currentLocation.lng}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-white p-2 rounded-full shadow-md hover:bg-blue-50 transition-colors"
+                            title="Open in Google Maps"
+                          >
+                            <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
+                            </svg>
+                          </a>
+                        </div>
+                      </div>
+
+                      {/* Details Section */}
+                      <div className="w-full md:w-1/3 h-full bg-gray-50 p-4 overflow-y-auto border-t md:border-t-0 md:border-l border-gray-200">
+                        <div className="space-y-4">
+                          <div className="bg-white rounded-lg shadow-sm p-4">
+                            <h4 className="font-medium text-gray-900 flex items-center">
+                              <FaMapMarkerAlt className="text-blue-500 mr-2" />
+                              Coordinates
+                            </h4>
+                            <div className="mt-2 grid grid-cols-2 gap-2">
+                              <div>
+                                <p className="text-xs text-gray-500">Latitude</p>
+                                <p className="text-sm font-mono bg-gray-100 p-1 rounded">{currentLocation.lat}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-gray-500">Longitude</p>
+                                <p className="text-sm font-mono bg-gray-100 p-1 rounded">{currentLocation.lng}</p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="bg-white rounded-lg shadow-sm p-4">
+                            <h4 className="font-medium text-gray-900 flex items-center">
+                              <svg className="w-4 h-4 text-blue-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                              </svg>
+                              Map Links
+                            </h4>
+                            <div className="mt-2 space-y-2">
+                              <a
+                                href={`https://www.google.com/maps?q=${currentLocation.lat},${currentLocation.lng}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center justify-between p-2 bg-blue-50 rounded hover:bg-blue-100 text-blue-700 text-sm transition-colors"
+                              >
+                                <span>Google Maps</span>
+                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                                </svg>
+                              </a>
+                            </div>
+                          </div>
+                          <div className="bg-white rounded-lg shadow-sm p-4">
+                            <h4 className="font-medium text-gray-900 flex items-center">
+                              <svg className="w-4 h-4 text-blue-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+                              </svg>
+                              Actions
+                            </h4>
+                            <div className="mt-2 space-y-2">
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(`${currentLocation.lat}, ${currentLocation.lng}`);
+                                  toast.success('Coordinates copied to clipboard');
+                                }}
+                                className="w-full flex items-center justify-between p-2 bg-gray-50 rounded hover:bg-gray-100 text-gray-700 text-sm transition-colors"
+                              >
+                                <span>Copy Coordinates</span>
+                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                  <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                                  <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const link = `https://www.google.com/maps?q=${currentLocation.lat},${currentLocation.lng}`;
+                                  navigator.clipboard.writeText(link);
+                                  toast.success('Map link copied to clipboard');
+                                }}
+                                className="w-full flex items-center justify-between p-2 bg-gray-50 rounded hover:bg-gray-100 text-gray-700 text-sm transition-colors"
+                              >
+                                <span>Copy Map Link</span>
+                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                  <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                                  <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border-t border-gray-200 p-4 flex justify-end bg-white">
+                      <button
+                        onClick={() => setShowMapModal(false)}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="bg-white px-3 py-2 flex items-center justify-between border-t border-gray-200">
                 <div className="flex-1 flex justify-between sm:hidden">

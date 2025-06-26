@@ -11,17 +11,20 @@ exports.createMovement = (req, res) => {
     purpose,
     remark,
     punchTime,
-    punchingTime
+    punchingTime,
+    latitude,
+    longitude
   } = req.body;
 
   const sql = `INSERT INTO movementdata 
-    (userID, username, visitingStatus, placeName, partyName, purpose, remark, punchTime, punchingTime) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    (userID, username, visitingStatus, placeName, partyName, purpose, remark, punchTime, punchingTime, latitude, longitude) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
   db.query(sql, [
     userID, username, visitingStatus,
     placeName, partyName, purpose,
-    remark, punchTime, punchingTime
+    remark, punchTime, punchingTime,
+    latitude, longitude
   ], (err, result) => {
     if (err) return res.status(500).json({ error: err.message });
     res.status(201).json({ message: 'Movement record added', id: result.insertId });
