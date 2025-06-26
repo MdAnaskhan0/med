@@ -367,7 +367,7 @@ const MovementReports = () => {
       )}
 
       <div className="flex flex-col flex-1 w-full">
-        <header className="flex items-center justify-between bg-white shadow-sm p-4 border-b">
+        <header className="flex items-center justify-between bg-white shadow-sm p-4">
           <div className="flex items-center">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -408,20 +408,20 @@ const MovementReports = () => {
           </div>
         </header>
 
-        <div className="bg-white shadow-sm p-3 border-b">
+        <div className="bg-white shadow-sm p-3">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
                 <FaSearch className="text-gray-400 text-xs" />
               </div>
               <select
-                className="pl-8 pr-3 py-1.5 w-full border rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-xs"
+                className="pl-8 pr-3 py-1.5 w-full border rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-xs border-gray-500"
                 value={selectedUser}
                 onChange={(e) => setSelectedUser(e.target.value)}
               >
                 <option value="">Select User</option>
                 {users.map(user => (
-                  <option key={user.username} value={user.username}>
+                  <option key={user.username} value={user.username} className='capitalize'>
                     {user.username}
                   </option>
                 ))}
@@ -433,7 +433,7 @@ const MovementReports = () => {
                 <FaFilter className="text-gray-400 text-xs" />
               </div>
               <select
-                className="pl-8 pr-3 py-1.5 w-full border rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-xs"
+                className="pl-8 pr-3 py-1.5 w-full border rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-xs border-gray-500"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
@@ -449,7 +449,7 @@ const MovementReports = () => {
               </div>
               <input
                 type="date"
-                className="pl-8 pr-3 py-1.5 w-full border rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-xs"
+                className="pl-8 pr-3 py-1.5 w-full border rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-xs border-gray-500"
                 value={dateRange.start}
                 onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
               />
@@ -461,7 +461,7 @@ const MovementReports = () => {
               </div>
               <input
                 type="date"
-                className="pl-8 pr-3 py-1.5 w-full border rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-xs"
+                className="pl-8 pr-3 py-1.5 w-full border rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-xs border-gray-500"
                 value={dateRange.end}
                 onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
               />
