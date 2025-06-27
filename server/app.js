@@ -34,8 +34,7 @@ app.use(cors({
     'http://localhost:5174',
     'http://192.168.111.140:5173',
     'http://192.168.111.140:5174',
-    'https://med-admin-weld.vercel.app',
-    'https://med-fashion.vercel.app',
+    'https://med-movement.vercel.app/',
   ],
   credentials: true
 }));
