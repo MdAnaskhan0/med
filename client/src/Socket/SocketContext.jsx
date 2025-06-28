@@ -8,19 +8,21 @@ export const SocketProvider = ({ children }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [transport, setTransport] = useState('N/A');
   const [error, setError] = useState(null);
+  const [messages, setMessages] = useState({}); // { [teamId]: message[] }
+  const [activeTeam, setActiveTeam] = useState(null);
 
+  // Initialize socket connection
   useEffect(() => {
-    // Initialize socket connection
     socketRef.current = io('https://med-7bj4.onrender.com', {
-      transports: ['websocket'], // Force WebSocket only
+      transports: ['websocket', 'polling'],
       withCredentials: true,
-      secure: true, // Required for HTTPS
+      secure: true,
       reconnection: true,
-      reconnectionAttempts: Infinity,
+      reconnectionAttempts: 5,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       autoConnect: true,
-      forceNew: true, // Prevent connection sharing
+      forceNew: false,
       timeout: 20000
     });
 
@@ -29,59 +31,88 @@ export const SocketProvider = ({ children }) => {
       setIsConnected(true);
       setTransport(socketRef.current.io.engine.transport.name);
       setError(null);
-      console.log('WebSocket connected:', socketRef.current.id);
+      console.log('Socket connected');
+      
+      // Rejoin active team if reconnected
+      if (activeTeam) {
+        joinTeam(activeTeam);
+      }
     });
 
     socketRef.current.on('disconnect', (reason) => {
       setIsConnected(false);
       setTransport('N/A');
-      console.log('WebSocket disconnected:', reason);
-      
-      if (reason === 'io server disconnect') {
-        // Server-initiated disconnect - try to reconnect
-        setTimeout(() => socketRef.current.connect(), 1000);
-      }
+      console.log('Disconnected:', reason);
     });
 
     socketRef.current.on('connect_error', (err) => {
       setIsConnected(false);
       setError(err.message);
-      console.error('Connection error:', err.message);
-      
-      // Diagnostic logging
-      console.log('Connection details:', {
-        url: 'https://med-7bj4.onrender.com',
-        options: socketRef.current.io.opts,
-        error: err
+      console.error('Connection error:', err);
+    });
+
+    // Message handling
+    socketRef.current.on('messageHistory', (history) => {
+      if (history?.length > 0) {
+        const teamId = history[0].team_id;
+        setMessages(prev => ({ ...prev, [teamId]: history }));
+      }
+    });
+
+    socketRef.current.on('newMessage', (message) => {
+      setMessages(prev => {
+        const teamId = message.team_id;
+        const existing = prev[teamId] || [];
+        return { ...prev, [teamId]: [...existing, message] };
       });
     });
 
-    socketRef.current.on('transport-upgrade', (transport) => {
-      console.log('Transport upgraded to:', transport.name);
-      setTransport(transport.name);
+    socketRef.current.on('teamError', (error) => {
+      console.error('Team error:', error);
     });
 
-    // Cleanup on unmount
+    socketRef.current.on('messageError', (error) => {
+      console.error('Message error:', error);
+    });
+
     return () => {
       if (socketRef.current) {
-        socketRef.current.removeAllListeners();
+        socketRef.current.off('connect');
+        socketRef.current.off('disconnect');
+        socketRef.current.off('messageHistory');
+        socketRef.current.off('newMessage');
         socketRef.current.disconnect();
-        socketRef.current = null;
       }
     };
   }, []);
 
-  // Context value
+  const joinTeam = (teamId) => {
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('joinTeam', teamId);
+      setActiveTeam(teamId);
+    }
+  };
+
+  const sendMessage = (messageData) => {
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('sendMessage', messageData);
+    }
+  };
+
+  const getTeamMessages = (teamId) => {
+    return messages[teamId] || [];
+  };
+
   const value = {
     socket: socketRef.current,
     isConnected,
     transport,
     error,
-    reconnect: () => {
-      if (socketRef.current && !socketRef.current.connected) {
-        socketRef.current.connect();
-      }
-    }
+    messages,
+    joinTeam,
+    sendMessage,
+    getTeamMessages,
+    reconnect: () => socketRef.current?.connect()
   };
 
   return (
@@ -93,8 +124,6 @@ export const SocketProvider = ({ children }) => {
 
 export const useSocket = () => {
   const context = useContext(SocketContext);
-  if (!context) {
-    throw new Error('useSocket must be used within a SocketProvider');
-  }
+  if (!context) throw new Error('useSocket must be used within SocketProvider');
   return context;
 };
