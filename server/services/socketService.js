@@ -12,6 +12,7 @@ const init = (server) => {
         'http://192.168.111.140:5173',
         'http://192.168.111.140:5174',
         'https://med-movement.vercel.app',
+        'https://med-admin-khaki.vercel.app/',
         'https://med-7bj4.onrender.com'
       ],
       methods: ['GET', 'POST'],
