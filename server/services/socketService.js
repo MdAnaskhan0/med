@@ -16,16 +16,7 @@ const init = (server) => {
 
   io = new Server(server, {
     cors: {
-      origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
-        
-        if (allowedOrigins.includes(origin)) {
-          callback(null, true);
-        } else {
-          callback(new Error('Not allowed by CORS'));
-        }
-      },
+      origin: allowedOrigins,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
       credentials: true,
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
@@ -49,7 +40,6 @@ const init = (server) => {
     if (origin && allowedOrigins.includes(origin)) {
       headers['Access-Control-Allow-Origin'] = origin;
       headers['Access-Control-Allow-Credentials'] = 'true';
-      headers['Vary'] = 'Origin';
     }
   });
 
@@ -62,8 +52,8 @@ const init = (server) => {
   });
 
   io.on('connection', (socket) => {
-    console.log(`New connection: ${socket.id}`);
-    socket.emit('connection-success', { socketId: socket.id });
+    console.log(`New connection: ${socket.id} from origin: ${socket.handshake.headers.origin}`);
+    socket.emit('connection-success', { socketId: socket.id, status: 'connected' });
 
     socket.on('joinTeam', (teamId) => {
       socket.join(`team_${teamId}`);
@@ -86,25 +76,33 @@ const init = (server) => {
           created_at: new Date()
         };
 
-        io.to(`team_${team_id}`).emit('receiveMessage', newMessage);
+        io.to(`team_${teamId}`).emit('receiveMessage', newMessage);
       } catch (err) {
         console.error('Message send error:', err);
         socket.emit('messageError', { error: 'Failed to send message' });
       }
     });
 
-    socket.on('disconnect', () => {
-      console.log(`Socket disconnected: ${socket.id}`);
+    socket.on('disconnect', (reason) => {
+      console.log(`Socket disconnected: ${socket.id}`, reason);
+    });
+
+    socket.on('error', (err) => {
+      console.error(`Socket error (${socket.id}):`, err);
     });
   });
+
+  console.log('Socket.IO server initialized');
+};
+
+const getIO = () => {
+  if (!io) {
+    throw new Error('Socket.IO not initialized');
+  }
+  return io;
 };
 
 module.exports = {
   init,
-  getIO: () => {
-    if (!io) {
-      throw new Error('Socket.io not initialized');
-    }
-    return io;
-  }
+  getIO
 };
