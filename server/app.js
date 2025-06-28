@@ -25,7 +25,7 @@ const permissionRoutes = require('./routes/permissionRoutes');
 
 const app = express();
 
-// Configure allowed origins (ensure no trailing slashes)
+// Configure allowed origins
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
@@ -36,19 +36,16 @@ const allowedOrigins = [
   'https://med-7bj4.onrender.com'
 ];
 
-// Critical CORS middleware - must come first
+// Enhanced CORS middleware
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  
   if (allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Vary', 'Origin');
   }
-  
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Socket-ID');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Expose-Headers', 'X-Socket-ID');
   
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
@@ -61,25 +58,6 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
-
-// Additional CORS config
-app.use(cors({
-  origin: function(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-}));
-
-// Ensure uploads directory exists
-if (!fs.existsSync('uploads')) {
-  fs.mkdirSync('uploads');
-}
 
 // Routes
 app.use('/admin', adminRoutes);
