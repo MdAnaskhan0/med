@@ -1,63 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const multer = require('multer');
 const fs = require('fs');
-
-const app = express();
-
-// Ensure uploads directory exists
-if (!fs.existsSync('uploads')) {
-  fs.mkdirSync('uploads');
-}
-
-// CORS Middleware - placed before route imports
-app.use((req, res, next) => {
-  const allowedOrigins = [
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'http://192.168.111.140:5173',
-    'http://192.168.111.140:5174',
-    'https://med-movement.vercel.app',
-    'https://med-7bj4.onrender.com'
-  ];
-  
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-  
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-  
-  next();
-});
-
-// Express built-in middleware
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json());
-
-// CORS configuration
-app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'http://192.168.111.140:5173',
-    'http://192.168.111.140:5174',
-    'https://med-movement.vercel.app',
-    'https://med-admin-khaki.vercel.app/',
-    'https://med-7bj4.onrender.com'
-  ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
 
 // Route imports
 const adminRoutes = require('./routes/adminRoutes');
@@ -78,6 +22,54 @@ const visitingStatusRoutes = require('./routes/visitingStatusRoutes');
 const roleRoutes = require('./routes/roleRoutes');
 const teamRoutes = require('./routes/teamRoutes');
 const permissionRoutes = require('./routes/permissionRoutes');
+
+const app = express();
+
+// Configure allowed origins
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://192.168.111.140:5173',
+  'http://192.168.111.140:5174',
+  'https://movement-med.vercel.app',
+  'https://med-admin-khaki.vercel.app',
+  'https://med-7bj4.onrender.com'
+];
+
+// CORS middleware - must come before routes
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  next();
+});
+
+// Express middleware
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Additional CORS configuration
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// Ensure uploads directory exists
+if (!fs.existsSync('uploads')) {
+  fs.mkdirSync('uploads');
+}
 
 // Routes
 app.use('/admin', adminRoutes);
@@ -101,8 +93,11 @@ app.use('/permissions', permissionRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
+  if (err.message === 'Not allowed by CORS') {
+    return res.status(403).json({ error: 'CORS not allowed' });
+  }
   console.error(err.stack);
-  res.status(500).send('Something broke!');
+  res.status(500).send('Server Error');
 });
 
 module.exports = app;
