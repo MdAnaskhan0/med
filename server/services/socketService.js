@@ -8,7 +8,7 @@ const init = (server) => {
     'https://med-movement.vercel.app',
     'https://med-admin-khaki.vercel.app',
     'https://med-7bj4.onrender.com',
-    ];
+  ];
 
   io = new Server(server, {
     cors: {
@@ -17,21 +17,16 @@ const init = (server) => {
       allowedHeaders: ['Content-Type', 'Authorization'],
       credentials: true
     },
-    // Recommended settings for production
-    transports: ['websocket', 'polling'], // Allow both with fallback
+    transports: ['websocket', 'polling'],
     allowEIO3: true,
+    connectionStateRecovery: {
+      maxDisconnectionDuration: 2 * 60 * 1000,
+      skipMiddlewares: true
+    },
     pingTimeout: 60000,
-    pingInterval: 25000,
-    cookie: {
-      name: 'io',
-      path: '/',
-      httpOnly: true,
-      sameSite: 'none',
-      secure: true
-    }
+    pingInterval: 25000
   });
 
-  // Enhanced headers for CORS
   io.engine.on('headers', (headers, req) => {
     if (allowedOrigins.includes(req.headers.origin)) {
       headers['Access-Control-Allow-Origin'] = req.headers.origin;
@@ -41,82 +36,79 @@ const init = (server) => {
     }
   });
 
-  // Connection error handling
   io.engine.on('connection_error', (err) => {
     console.error('Socket.IO connection error:', err);
   });
 
   io.on('connection', (socket) => {
-    console.log(`New WebSocket connection: ${socket.id} from ${socket.handshake.headers.origin || 'unknown origin'}`);
+    console.log(`New connection: ${socket.id}`);
 
-    // Team room management
-    socket.on('joinTeam', (teamId) => {
+    // Join team room and load history
+    socket.on('joinTeam', async (teamId) => {
       try {
-        if (!teamId) {
-          throw new Error('Team ID is required');
-        }
+        if (!teamId) throw new Error('Team ID required');
+        
         socket.join(`team_${teamId}`);
-        console.log(`Socket ${socket.id} joined team ${teamId}`);
+        console.log(`${socket.id} joined team ${teamId}`);
+
+        // Load message history
+        const [messages] = await db.promise().query(
+          'SELECT * FROM team_messages WHERE team_id = ? ORDER BY created_at ASC',
+          [teamId]
+        );
+        socket.emit('messageHistory', messages);
       } catch (err) {
         console.error('Join team error:', err);
-        socket.emit('joinError', { error: err.message });
+        socket.emit('teamError', { error: err.message });
       }
     });
 
-    // Message handling
+    // Handle new messages
     socket.on('sendMessage', async (data) => {
       try {
-        const { team_id, sender_name, message } = data;
+        const { team_id, sender_id, sender_name, message } = data;
         
-        if (!team_id || !sender_name || !message) {
+        if (!team_id || !sender_id || !message) {
           throw new Error('Missing required fields');
         }
 
         const [result] = await db.promise().query(
-          'INSERT INTO team_messages (team_id, sender_name, message) VALUES (?, ?, ?)',
-          [team_id, sender_name, message]
+          'INSERT INTO team_messages (team_id, sender_id, sender_name, message) VALUES (?, ?, ?, ?)',
+          [team_id, sender_id, sender_name, message]
         );
 
         const newMessage = {
           id: result.insertId,
           team_id,
+          sender_id,
           sender_name,
           message,
           created_at: new Date().toISOString()
         };
 
+        // Broadcast to all in team room
         io.to(`team_${team_id}`).emit('newMessage', newMessage);
       } catch (err) {
-        console.error('Message send error:', err);
-        socket.emit('messageError', {
-          error: 'Failed to send message',
-          details: err.message
-        });
+        console.error('Send message error:', err);
+        socket.emit('messageError', { error: err.message });
       }
     });
 
-    // Disconnection handling
     socket.on('disconnect', (reason) => {
-      console.log(`WebSocket disconnected: ${socket.id}`, reason);
+      console.log(`Disconnected: ${socket.id}`, reason);
     });
 
-    // Error handling
     socket.on('error', (err) => {
-      console.error(`WebSocket error (${socket.id}):`, err);
+      console.error(`Socket error (${socket.id}):`, err);
     });
   });
 
-  console.log('Socket.IO server initialized with enhanced configuration');
+  console.log('Socket.IO server initialized');
 };
 
 const getIO = () => {
-  if (!io) {
-    throw new Error('Socket.IO not initialized. Call init() first.');
-  }
+  if (!io) throw new Error('Socket.IO not initialized');
   return io;
 };
 
-module.exports = {
-  init,
-  getIO
-};
+module.exports = { init, getIO };
