@@ -11,8 +11,8 @@ export const SocketProvider = ({ children }) => {
   const [messages, setMessages] = useState({}); // { [teamId]: message[] }
   const [activeTeam, setActiveTeam] = useState(null);
 
-  // Initialize socket connection
   useEffect(() => {
+    // Initialize socket connection
     socketRef.current = io('https://med-7bj4.onrender.com', {
       transports: ['websocket', 'polling'],
       withCredentials: true,
@@ -67,21 +67,10 @@ export const SocketProvider = ({ children }) => {
       });
     });
 
-    socketRef.current.on('teamError', (error) => {
-      console.error('Team error:', error);
-    });
-
-    socketRef.current.on('messageError', (error) => {
-      console.error('Message error:', error);
-    });
-
     return () => {
       if (socketRef.current) {
-        socketRef.current.off('connect');
-        socketRef.current.off('disconnect');
-        socketRef.current.off('messageHistory');
-        socketRef.current.off('newMessage');
         socketRef.current.disconnect();
+        socketRef.current = null;
       }
     };
   }, []);
@@ -95,8 +84,19 @@ export const SocketProvider = ({ children }) => {
 
   const sendMessage = (messageData) => {
     if (socketRef.current?.connected) {
+      // Validate required fields
+      const requiredFields = ['team_id', 'sender_id', 'sender_name', 'message'];
+      const missingFields = requiredFields.filter(field => !messageData[field]);
+      
+      if (missingFields.length > 0) {
+        console.error('Missing required fields:', missingFields);
+        return false;
+      }
+
       socketRef.current.emit('sendMessage', messageData);
+      return true;
     }
+    return false;
   };
 
   const getTeamMessages = (teamId) => {
