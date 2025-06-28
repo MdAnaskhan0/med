@@ -8,10 +8,18 @@ export const SocketProvider = ({ children }) => {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    // Connect socket with CORS and websocket transport
+    // Connect socket with comprehensive options
     socketRef.current = io('https://med-7bj4.onrender.com', {
-      transports: ['websocket'],
+      transports: ['websocket', 'polling'],
       withCredentials: true,
+      secure: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      autoConnect: true,
+      auth: {
+        token: localStorage.getItem('token') || null
+      }
     });
 
     socketRef.current.on('connect', () => {
@@ -19,18 +27,32 @@ export const SocketProvider = ({ children }) => {
       console.log('Socket connected:', socketRef.current.id);
     });
 
-    socketRef.current.on('disconnect', () => {
+    socketRef.current.on('disconnect', (reason) => {
       setConnected(false);
-      console.log('Socket disconnected');
+      console.log('Socket disconnected:', reason);
+      if (reason === 'io server disconnect') {
+        // The server has forcefully disconnected the socket
+        socketRef.current.connect();
+      }
+    });
+
+    socketRef.current.on('connect_error', (err) => {
+      console.error('Connection error:', err.message);
+    });
+
+    socketRef.current.on('connection-success', (data) => {
+      console.log('Connection established with server:', data);
     });
 
     return () => {
-      socketRef.current.disconnect();
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+      }
     };
   }, []);
 
   return (
-    <SocketContext.Provider value={socketRef.current}>
+    <SocketContext.Provider value={{ socket: socketRef.current, connected }}>
       {children}
     </SocketContext.Provider>
   );
