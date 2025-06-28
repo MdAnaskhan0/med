@@ -25,7 +25,6 @@ const init = (server) => {
       headers['Access-Control-Allow-Credentials'] = 'true';
     }
   });
-};
 
   io.on('connection', (socket) => {
     console.log(`New WebSocket connection: ${socket.id} from ${socket.handshake.headers.origin || 'unknown origin'}`);
