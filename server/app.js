@@ -25,7 +25,7 @@ const permissionRoutes = require('./routes/permissionRoutes');
 
 const app = express();
 
-// Configure allowed origins
+// Configure allowed origins (ensure no trailing slashes)
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
@@ -36,16 +36,19 @@ const allowedOrigins = [
   'https://med-7bj4.onrender.com'
 ];
 
-// Enhanced CORS middleware
+// Critical CORS middleware - must come first
 app.use((req, res, next) => {
   const origin = req.headers.origin;
+  
   if (allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Vary', 'Origin');
   }
+  
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Socket-ID');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Expose-Headers', 'X-Socket-ID');
   
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
@@ -100,7 +103,10 @@ app.use('/permissions', permissionRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'OK' });
+  res.status(200).json({ 
+    status: 'OK',
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Error handling middleware
@@ -108,7 +114,8 @@ app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ 
     error: 'Internal Server Error',
-    message: err.message
+    message: err.message,
+    timestamp: new Date().toISOString()
   });
 });
 
