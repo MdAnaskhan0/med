@@ -33,16 +33,23 @@ const init = (server) => {
     transports: ['websocket', 'polling'],
     allowEIO3: true,
     pingTimeout: 60000,
-    pingInterval: 25000
+    pingInterval: 25000,
+    cookie: {
+      name: "io",
+      path: "/",
+      httpOnly: true,
+      sameSite: "none",
+      secure: true
+    }
   });
 
-  // Special handling for Engine.IO CORS
+  // Engine.IO CORS handling
   io.engine.on('initial_headers', (headers, req) => {
     const origin = req.headers.origin;
-    console.log('Socket connection origin:', origin);
     if (origin && allowedOrigins.includes(origin)) {
       headers['Access-Control-Allow-Origin'] = origin;
       headers['Access-Control-Allow-Credentials'] = 'true';
+      headers['Vary'] = 'Origin';
     }
   });
 
@@ -56,6 +63,7 @@ const init = (server) => {
 
   io.on('connection', (socket) => {
     console.log(`New connection: ${socket.id}`);
+    socket.emit('connection-success', { socketId: socket.id });
 
     socket.on('joinTeam', (teamId) => {
       socket.join(`team_${teamId}`);
@@ -93,5 +101,10 @@ const init = (server) => {
 
 module.exports = {
   init,
-  getIO: () => io
+  getIO: () => {
+    if (!io) {
+      throw new Error('Socket.io not initialized');
+    }
+    return io;
+  }
 };
