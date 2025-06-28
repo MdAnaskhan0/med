@@ -83,7 +83,8 @@ app.use('/permissions', permissionRoutes);
 app.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'OK',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    origins: allowedOrigins
   });
 });
 
