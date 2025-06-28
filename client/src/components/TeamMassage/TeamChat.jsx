@@ -82,7 +82,7 @@ const TeamChat = ({ selectedTeam, user, updateUnreadCount }) => {
 
     const messageData = {
       team_id: selectedTeam.team_id,
-      sender_id: user.id, // Make sure user object has id
+      sender_id: user.userID, // Make sure user object has id
       sender_name: user.name,
       message: messageText.trim()
     };
