@@ -6,7 +6,7 @@ let io;
 const init = (server) => {
   const allowedOrigins = [
     'https://med-movement.vercel.app',
-    'https://med-admin-khaki.vercel.app',
+    'https://med-admin-khaki.vercel.app', 
     'https://med-7bj4.onrender.com',
   ];
 
@@ -14,36 +14,17 @@ const init = (server) => {
     cors: {
       origin: allowedOrigins,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
       credentials: true
     },
     transports: ['websocket', 'polling'],
-    allowEIO3: true,
-    connectionStateRecovery: {
-      maxDisconnectionDuration: 2 * 60 * 1000,
-      skipMiddlewares: true
-    },
     pingTimeout: 60000,
     pingInterval: 25000
-  });
-
-  io.engine.on('headers', (headers, req) => {
-    if (allowedOrigins.includes(req.headers.origin)) {
-      headers['Access-Control-Allow-Origin'] = req.headers.origin;
-      headers['Access-Control-Allow-Credentials'] = 'true';
-      headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
-      headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization';
-    }
-  });
-
-  io.engine.on('connection_error', (err) => {
-    console.error('Socket.IO connection error:', err);
   });
 
   io.on('connection', (socket) => {
     console.log(`New connection: ${socket.id}`);
 
-    // Join team room and send message history
+    // Join team room and load history
     socket.on('joinTeam', async (teamId) => {
       try {
         if (!teamId) throw new Error('Team ID required');
@@ -51,7 +32,7 @@ const init = (server) => {
         socket.join(`team_${teamId}`);
         console.log(`${socket.id} joined team ${teamId}`);
 
-        // Load and send message history
+        // Load message history
         const [messages] = await db.promise().query(
           'SELECT * FROM team_messages WHERE team_id = ? ORDER BY created_at ASC',
           [teamId]
@@ -66,54 +47,39 @@ const init = (server) => {
     // Handle new messages
     socket.on('sendMessage', async (data) => {
       try {
-        console.log('Received message data:', data);
-        
         // Validate required fields
-        const requiredFields = ['team_id', 'sender_id', 'sender_name', 'message'];
-        const missingFields = requiredFields.filter(field => !data[field]);
-        
-        if (missingFields.length > 0) {
-          throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
-        }
+        if (!data.team_id) throw new Error('Team ID is required');
+        if (!data.message) throw new Error('Message is required');
 
-        const { team_id, sender_id, sender_name, message } = data;
-
+        // Insert into database
         const [result] = await db.promise().query(
-          'INSERT INTO team_messages (team_id, sender_id, sender_name, message) VALUES (?, ?, ?, ?)',
-          [team_id, sender_id, sender_name, message]
+          'INSERT INTO team_messages (team_id, sender_name, message) VALUES (?, ?, ?)',
+          [data.team_id, data.sender_name || 'Anonymous', data.message]
         );
 
+        // Create response object
         const newMessage = {
           id: result.insertId,
-          team_id,
-          sender_id,
-          sender_name,
-          message,
+          team_id: data.team_id,
+          sender_name: data.sender_name || 'Anonymous',
+          message: data.message,
           created_at: new Date().toISOString()
         };
 
-        console.log('Broadcasting new message:', newMessage);
-        io.to(`team_${team_id}`).emit('newMessage', newMessage);
+        // Broadcast to team room
+        io.to(`team_${data.team_id}`).emit('newMessage', newMessage);
       } catch (err) {
-        console.error('Send message error:', err.message);
-        socket.emit('messageError', { 
-          error: 'Failed to send message',
-          details: err.message,
-          receivedData: data
-        });
+        console.error('Message send error:', err);
+        socket.emit('messageError', { error: err.message });
       }
     });
 
-    socket.on('disconnect', (reason) => {
-      console.log(`Disconnected: ${socket.id}`, reason);
-    });
-
-    socket.on('error', (err) => {
-      console.error(`Socket error (${socket.id}):`, err);
+    socket.on('disconnect', () => {
+      console.log(`Disconnected: ${socket.id}`);
     });
   });
 
-  console.log('Socket.IO server initialized');
+  console.log('Socket.IO server running');
 };
 
 const getIO = () => {
