@@ -5,35 +5,27 @@ let io;
 
 const init = (server) => {
   const allowedOrigins = [
-    'https://movement-med.vercel.app',
+    'https://med-movement.vercel.app', // Your frontend
     'https://med-admin-khaki.vercel.app',
-    'https://med-7bj4.onrender.com',
-    'http://localhost:5173',
-    'http://localhost:5174'
+    'https://med-7bj4.onrender.com'
   ];
 
   io = new Server(server, {
     cors: {
       origin: allowedOrigins,
-      methods: ['GET', 'POST'],
       credentials: true
     },
-    allowEIO3: true,
-    transports: ['websocket'], // WebSocket only
-    pingTimeout: 60000,
-    pingInterval: 25000,
-    cookie: false, // Disable cookies
-    serveClient: false // Don't serve client files
+    transports: ['websocket'], // Force WebSocket only
+    allowEIO3: true
   });
 
-  // Force CORS headers for all responses
   io.engine.on('headers', (headers, req) => {
-    const origin = req.headers.origin;
-    if (origin && allowedOrigins.includes(origin)) {
-      headers['Access-Control-Allow-Origin'] = origin;
+    if (allowedOrigins.includes(req.headers.origin)) {
+      headers['Access-Control-Allow-Origin'] = req.headers.origin;
       headers['Access-Control-Allow-Credentials'] = 'true';
     }
   });
+};
 
   io.on('connection', (socket) => {
     console.log(`New WebSocket connection: ${socket.id} from ${socket.handshake.headers.origin || 'unknown origin'}`);
