@@ -21,44 +21,62 @@ const init = (server) => {
       credentials: true,
       allowedHeaders: ['Content-Type', 'Authorization']
     },
-    transports: ['websocket', 'polling'] // Add fallback transports
+    transports: ['websocket', 'polling'],
+    allowEIO3: true,
+    pingTimeout: 60000,
+    pingInterval: 25000
+  });
+
+  // Special handling for Engine.IO CORS
+  io.engine.on('initial_headers', (headers, req) => {
+    const origin = req.headers.origin;
+    if (origin && allowedOrigins.includes(origin)) {
+      headers['Access-Control-Allow-Origin'] = origin;
+      headers['Access-Control-Allow-Credentials'] = 'true';
+    }
+  });
+
+  io.engine.on('headers', (headers, req) => {
+    const origin = req.headers.origin;
+    if (origin && allowedOrigins.includes(origin)) {
+      headers['Access-Control-Allow-Origin'] = origin;
+      headers['Access-Control-Allow-Credentials'] = 'true';
+    }
   });
 
   io.on('connection', (socket) => {
-    console.log('New client connected');
+    console.log(`New connection: ${socket.id}`);
 
     socket.on('joinTeam', (teamId) => {
       socket.join(`team_${teamId}`);
-      console.log(`Client joined team ${teamId}`);
+      console.log(`Socket ${socket.id} joined team ${teamId}`);
     });
 
-    socket.on('sendMessage', (data) => {
-      const { team_id, sender_name, message } = data;
-      
-      db.query(
-        'INSERT INTO team_messages (team_id, sender_name, message) VALUES (?, ?, ?)',
-        [team_id, sender_name, message],
-        (err, result) => {
-          if (err) {
-            console.error('Database error:', err);
-            return;
-          }
-          
-          const newMessage = {
-            id: result.insertId,
-            team_id,
-            sender_name,
-            message,
-            created_at: new Date()
-          };
-          
-          io.to(`team_${team_id}`).emit('receiveMessage', newMessage);
-        }
-      );
+    socket.on('sendMessage', async (data) => {
+      try {
+        const { team_id, sender_name, message } = data;
+        const [result] = await db.promise().query(
+          'INSERT INTO team_messages (team_id, sender_name, message) VALUES (?, ?, ?)',
+          [team_id, sender_name, message]
+        );
+
+        const newMessage = {
+          id: result.insertId,
+          team_id,
+          sender_name,
+          message,
+          created_at: new Date()
+        };
+
+        io.to(`team_${team_id}`).emit('receiveMessage', newMessage);
+      } catch (err) {
+        console.error('Message send error:', err);
+        socket.emit('messageError', { error: 'Failed to send message' });
+      }
     });
 
     socket.on('disconnect', () => {
-      console.log('Client disconnected');
+      console.log(`Socket disconnected: ${socket.id}`);
     });
   });
 };
