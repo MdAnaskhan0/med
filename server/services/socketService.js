@@ -43,7 +43,7 @@ const init = (server) => {
   io.on('connection', (socket) => {
     console.log(`New connection: ${socket.id}`);
 
-    // Join team room and load history
+    // Join team room and send message history
     socket.on('joinTeam', async (teamId) => {
       try {
         if (!teamId) throw new Error('Team ID required');
@@ -51,7 +51,7 @@ const init = (server) => {
         socket.join(`team_${teamId}`);
         console.log(`${socket.id} joined team ${teamId}`);
 
-        // Load message history
+        // Load and send message history
         const [messages] = await db.promise().query(
           'SELECT * FROM team_messages WHERE team_id = ? ORDER BY created_at ASC',
           [teamId]
@@ -66,11 +66,17 @@ const init = (server) => {
     // Handle new messages
     socket.on('sendMessage', async (data) => {
       try {
-        const { team_id, sender_id, sender_name, message } = data;
+        console.log('Received message data:', data);
         
-        if (!team_id || !sender_id || !message) {
-          throw new Error('Missing required fields');
+        // Validate required fields
+        const requiredFields = ['team_id', 'sender_id', 'sender_name', 'message'];
+        const missingFields = requiredFields.filter(field => !data[field]);
+        
+        if (missingFields.length > 0) {
+          throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
         }
+
+        const { team_id, sender_id, sender_name, message } = data;
 
         const [result] = await db.promise().query(
           'INSERT INTO team_messages (team_id, sender_id, sender_name, message) VALUES (?, ?, ?, ?)',
@@ -86,11 +92,15 @@ const init = (server) => {
           created_at: new Date().toISOString()
         };
 
-        // Broadcast to all in team room
+        console.log('Broadcasting new message:', newMessage);
         io.to(`team_${team_id}`).emit('newMessage', newMessage);
       } catch (err) {
-        console.error('Send message error:', err);
-        socket.emit('messageError', { error: err.message });
+        console.error('Send message error:', err.message);
+        socket.emit('messageError', { 
+          error: 'Failed to send message',
+          details: err.message,
+          receivedData: data
+        });
       }
     });
 
