@@ -31,23 +31,22 @@ const allowedOrigins = [
   'http://localhost:5174',
   'http://192.168.111.140:5173',
   'http://192.168.111.140:5174',
-  'https://movement-med.vercel.app', // Fixed potential typo in "movement"
+  'https://movement-med.vercel.app',
   'https://med-admin-khaki.vercel.app',
   'https://med-7bj4.onrender.com'
 ];
 
-// Enhanced CORS middleware - must come before routes
+// Enhanced CORS middleware
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Socket-ID');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Expose-Headers', 'X-Socket-ID');
   
-  // Handle preflight requests
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
   }
@@ -63,7 +62,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Additional CORS config
 app.use(cors({
   origin: function(origin, callback) {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+    if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -71,7 +70,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Socket-ID']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
 // Ensure uploads directory exists
@@ -98,6 +97,11 @@ app.use('/visitingstatus', visitingStatusRoutes);
 app.use('/roles', roleRoutes);
 app.use('/teams', teamRoutes);
 app.use('/permissions', permissionRoutes);
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'OK' });
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {
