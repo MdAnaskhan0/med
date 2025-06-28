@@ -11,55 +11,31 @@ export const SocketProvider = ({ children }) => {
   useEffect(() => {
     // Initialize socket connection
     socketRef.current = io('https://med-7bj4.onrender.com', {
+      transports: ['websocket'],
       withCredentials: true,
       secure: true,
-      transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      autoConnect: true,
-      extraHeaders: {
-        'Origin': window.location.origin
-      }
+      autoConnect: true
     });
 
     // Connection events
     socketRef.current.on('connect', () => {
       setConnectionStatus('connected');
       setSocketId(socketRef.current.id);
-      console.log('Socket connected:', socketRef.current.id);
-    });
-
-    socketRef.current.on('connection-confirmation', (data) => {
-      console.log('Server connection confirmation:', data);
+      console.log('Connected with ID:', socketRef.current.id);
     });
 
     socketRef.current.on('disconnect', (reason) => {
       setConnectionStatus('disconnected');
       setSocketId(null);
-      console.log('Socket disconnected:', reason);
-      
-      if (reason === 'io server disconnect') {
-        // The server has forcefully disconnected the socket
-        setTimeout(() => {
-          socketRef.current.connect();
-        }, 1000);
-      }
+      console.log('Disconnected:', reason);
     });
 
     socketRef.current.on('connect_error', (err) => {
       setConnectionStatus('error');
       console.error('Connection error:', err.message);
-      
-      // Try forcing polling if websocket fails
-      if (err.message.includes('websocket')) {
-        socketRef.current.io.opts.transports = ['polling', 'websocket'];
-      }
-    });
-
-    socketRef.current.on('error', (err) => {
-      console.error('Socket error:', err);
     });
 
     // Cleanup on unmount
