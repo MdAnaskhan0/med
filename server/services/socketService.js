@@ -18,14 +18,15 @@ const init = (server) => {
       methods: ['GET', 'POST'],
       credentials: true
     },
-    transports: ['websocket'],
     allowEIO3: true,
+    transports: ['websocket'], // WebSocket only
     pingTimeout: 60000,
     pingInterval: 25000,
-    cookie: false
+    cookie: false, // Disable cookies
+    serveClient: false // Don't serve client files
   });
 
-  // Special handling for Engine.IO CORS
+  // Force CORS headers for all responses
   io.engine.on('headers', (headers, req) => {
     const origin = req.headers.origin;
     if (origin && allowedOrigins.includes(origin)) {
@@ -35,7 +36,7 @@ const init = (server) => {
   });
 
   io.on('connection', (socket) => {
-    console.log(`New connection: ${socket.id}`);
+    console.log(`New WebSocket connection: ${socket.id} from ${socket.handshake.headers.origin || 'unknown origin'}`);
 
     socket.on('joinTeam', (teamId) => {
       socket.join(`team_${teamId}`);
@@ -68,10 +69,16 @@ const init = (server) => {
       }
     });
 
-    socket.on('disconnect', () => {
-      console.log(`Socket disconnected: ${socket.id}`);
+    socket.on('disconnect', (reason) => {
+      console.log(`WebSocket disconnected: ${socket.id}`, reason);
+    });
+
+    socket.on('error', (err) => {
+      console.error(`WebSocket error (${socket.id}):`, err);
     });
   });
+
+  console.log('Socket.IO server running in WebSocket-only mode');
 };
 
 const getIO = () => {
