@@ -1,6 +1,5 @@
-// [Unchanged imports]
 import React, { useState, useEffect, useRef } from 'react';
-import { io } from 'socket.io-client';
+import { useSocket } from '../../context/SocketContext'; // Make sure this path is correct
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { FaPaperPlane, FaUser, FaSmile } from 'react-icons/fa';
@@ -8,69 +7,62 @@ import { format } from 'date-fns';
 import { TailSpin } from 'react-loader-spinner';
 import EmojiPicker from 'emoji-picker-react';
 
-const socket = io(import.meta.env.VITE_API_BASE_URL);
-
 const TeamChat = ({ selectedTeam, user, updateUnreadCount }) => {
+  const { socket, isConnected, joinTeam, sendMessage: socketSendMessage } = useSocket();
   const [messages, setMessages] = useState([]);
   const [messageText, setMessageText] = useState('');
   const [loading, setLoading] = useState(true);
-  const [lastSeenMessageId, setLastSeenMessageId] = useState(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);
-  const [typingUser, setTypingUser] = useState('');
   const messagesEndRef = useRef(null);
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
   useEffect(() => {
-    if (!selectedTeam) return;
+    if (!selectedTeam || !isConnected) return;
 
-    socket.emit('joinTeam', selectedTeam.team_id);
+    // Join the team room
+    joinTeam(selectedTeam.team_id);
 
-    setLoading(true);
-    axios.get(`${baseUrl}/messages/${selectedTeam.team_id}`)
-      .then(res => {
+    // Load initial messages
+    const fetchMessages = async () => {
+      try {
+        setLoading(true);
+        const res = await axios.get(`${baseUrl}/messages/${selectedTeam.team_id}`);
         setMessages(res.data);
-        if (res.data.length > 0) {
-          setLastSeenMessageId(res.data[res.data.length - 1].id);
-        }
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error(err);
+      } catch (err) {
+        console.error('Failed to load messages:', err);
         toast.error('Failed to load messages');
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+
+    fetchMessages();
+
+    // Cleanup on unmount
+    return () => {
+      // No need to leave room - handled by socket service
+    };
+  }, [selectedTeam, isConnected]);
+
+  // Handle incoming messages
+  useEffect(() => {
+    if (!socket) return;
 
     const handleNewMessage = (message) => {
-      setMessages(prev => [...prev, message]);
-
-      if (message.team_id === selectedTeam.team_id) {
-        setLastSeenMessageId(message.id);
+      if (message.team_id === selectedTeam?.team_id) {
+        setMessages(prev => [...prev, message]);
+        scrollToBottom();
       } else {
-        const newMessages = messages.filter(m => m.id > lastSeenMessageId);
-        updateUnreadCount(message.team_id, newMessages.length);
+        updateUnreadCount(message.team_id, prev => prev + 1);
       }
     };
 
-    const handleTyping = (data) => {
-      if (data.user !== user.name) {
-        setIsTyping(true);
-        setTypingUser(data.user);
-        const timer = setTimeout(() => {
-          setIsTyping(false);
-        }, 2000);
-        return () => clearTimeout(timer);
-      }
-    };
-
-    socket.on('receiveMessage', handleNewMessage);
-    socket.on('typing', handleTyping);
+    socket.on('newMessage', handleNewMessage);
 
     return () => {
-      socket.off('receiveMessage', handleNewMessage);
-      socket.off('typing', handleTyping);
+      socket.off('newMessage', handleNewMessage);
     };
-  }, [selectedTeam]);
+  }, [socket, selectedTeam]);
 
   useEffect(() => {
     scrollToBottom();
@@ -81,33 +73,29 @@ const TeamChat = ({ selectedTeam, user, updateUnreadCount }) => {
   };
 
   const sendMessage = () => {
-    if (messageText.trim() === '') {
+    if (!messageText.trim()) {
       toast.warning('Message cannot be empty');
       return;
     }
 
-    const newMessage = {
+    if (!selectedTeam || !user) return;
+
+    const messageData = {
       team_id: selectedTeam.team_id,
+      sender_id: user.id, // Make sure user object has id
       sender_name: user.name,
-      message: messageText,
-      timestamp: new Date().toISOString()
+      message: messageText.trim()
     };
 
-    socket.emit('sendMessage', newMessage);
+    socketSendMessage(messageData);
     setMessageText('');
     setShowEmojiPicker(false);
-    setIsTyping(false);
   };
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
-    } else {
-      socket.emit('typing', {
-        team_id: selectedTeam.team_id,
-        user: user.name
-      });
     }
   };
 
@@ -130,7 +118,7 @@ const TeamChat = ({ selectedTeam, user, updateUnreadCount }) => {
     );
 
     return (
-      <React.Fragment key={index}>
+      <React.Fragment key={msg.id || index}>
         {showDateSeparator && (
           <div className="flex justify-center my-4">
             <div className="bg-gray-200 text-gray-600 text-xs px-3 py-1 rounded-full">
@@ -139,8 +127,8 @@ const TeamChat = ({ selectedTeam, user, updateUnreadCount }) => {
           </div>
         )}
 
-        <div className={`mb-4 flex ${msg.sender_name === user.name ? 'justify-end' : 'justify-start'}`}>
-          {msg.sender_name !== user.name && (
+        <div className={`mb-4 flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'}`}>
+          {msg.sender_id !== user.id && (
             <div className="mr-2 flex-shrink-0">
               <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
                 <FaUser className="text-blue-600 text-sm" />
@@ -149,11 +137,11 @@ const TeamChat = ({ selectedTeam, user, updateUnreadCount }) => {
           )}
 
           <div
-            className={`max-w-xs md:max-w-md rounded-xl px-4 py-2 ${msg.sender_name === user.name
+            className={`max-w-xs md:max-w-md rounded-xl px-4 py-2 ${msg.sender_id === user.id
               ? 'bg-blue-600 text-white rounded-br-none'
               : 'bg-white border border-gray-200 rounded-bl-none shadow-xs'}`}
           >
-            {msg.sender_name !== user.name && (
+            {msg.sender_id !== user.id && (
               <div className="flex items-center mb-1">
                 <span className="font-semibold text-xs text-gray-700">
                   {msg.sender_name}
@@ -161,7 +149,7 @@ const TeamChat = ({ selectedTeam, user, updateUnreadCount }) => {
               </div>
             )}
             <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
-            <div className={`mt-1 ${msg.sender_name === user.name ? 'text-right text-blue-100' : 'text-left text-gray-400'}`}>
+            <div className={`mt-1 ${msg.sender_id === user.id ? 'text-right text-blue-100' : 'text-left text-gray-400'}`}>
               <span className="text-xs">
                 {validTimestamp ? format(messageDate, 'h:mm a') : 'Invalid time'}
               </span>
@@ -180,10 +168,7 @@ const TeamChat = ({ selectedTeam, user, updateUnreadCount }) => {
           <TailSpin color="#3B82F6" height={40} width={40} />
         </div>
       ) : (
-        <div
-          className="flex-1 overflow-y-auto p-4 bg-gray-50"
-          id="chat-messages"
-        >
+        <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-500">
               <div className="bg-blue-100 p-4 rounded-full mb-4">
@@ -193,7 +178,7 @@ const TeamChat = ({ selectedTeam, user, updateUnreadCount }) => {
               <p className="text-sm">Send your first message to start the conversation!</p>
             </div>
           ) : (
-            messages.map((msg, index) => renderMessage(msg, index))
+            messages.map(renderMessage)
           )}
           <div ref={messagesEndRef} />
         </div>
@@ -211,21 +196,13 @@ const TeamChat = ({ selectedTeam, user, updateUnreadCount }) => {
           </div>
         )}
 
-        {isTyping && (
-          <div className="text-xs text-gray-500 mb-2 px-2">
-            {typingUser} is typing...
-          </div>
-        )}
-
         <div className="flex items-center">
-          <div>
-            <button
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className="p-2 text-gray-500 hover:text-blue-600 rounded-lg hover:bg-gray-100 mr-2"
-            >
-              <FaSmile className="text-xl" />
-            </button>
-          </div>
+          <button
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            className="p-2 text-gray-500 hover:text-blue-600 rounded-lg hover:bg-gray-100 mr-2"
+          >
+            <FaSmile className="text-xl" />
+          </button>
 
           <div className="flex-1 relative">
             <textarea
@@ -238,17 +215,15 @@ const TeamChat = ({ selectedTeam, user, updateUnreadCount }) => {
             />
           </div>
 
-          <div>
-            <button
-              onClick={sendMessage}
-              disabled={!messageText.trim()}
-              className={`ml-2 p-3 rounded-lg transition ${messageText.trim()
-                ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
-            >
-              <FaPaperPlane />
-            </button>
-          </div>
+          <button
+            onClick={sendMessage}
+            disabled={!messageText.trim()}
+            className={`ml-2 p-3 rounded-lg transition ${messageText.trim()
+              ? 'bg-blue-600 hover:bg-blue-700 text-white'
+              : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+          >
+            <FaPaperPlane />
+          </button>
         </div>
       </div>
     </div>
