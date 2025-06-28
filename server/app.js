@@ -27,30 +27,24 @@ const app = express();
 
 // Configure allowed origins
 const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'http://192.168.111.140:5173',
-  'http://192.168.111.140:5174',
-  'https://movement-med.vercel.app',
+  'https://med-movement.vercel.app', // Your frontend
   'https://med-admin-khaki.vercel.app',
   'https://med-7bj4.onrender.com'
 ];
 
-// Enhanced CORS middleware
+// Add this middleware FIRST
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Vary', 'Origin');
   }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   
   if (req.method === 'OPTIONS') {
-    return res.status(204).end();
+    return res.status(200).end();
   }
-  
   next();
 });
 
