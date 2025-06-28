@@ -32,24 +32,31 @@ const allowedOrigins = [
   'http://192.168.111.140:5173',
   'http://192.168.111.140:5174',
   'https://movement-med.vercel.app',
+  'https://www.movement-med.vercel.app', // Added www variant
   'https://med-admin-khaki.vercel.app',
   'https://med-7bj4.onrender.com'
 ];
 
-// Enhanced CORS middleware
+// 1. First CORS middleware - handles preflight requests
+app.options('*', cors({
+  origin: allowedOrigins,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// 2. Main CORS middleware
 app.use((req, res, next) => {
   const origin = req.headers.origin;
+  
   if (allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
   }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
   
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   
   next();
 });
@@ -59,12 +66,28 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Additional CORS config
+// 3. Additional CORS configuration
 app.use(cors({
-  origin: allowedOrigins,
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Normalize origin by removing trailing slash
+    const normalizedOrigin = origin.endsWith('/') ? origin.slice(0, -1) : origin;
+    
+    if (allowedOrigins.some(allowed => {
+      return normalizedOrigin === allowed || 
+             normalizedOrigin === allowed.replace('https://', 'https://www.');
+    })) {
+      return callback(null, true);
+    }
+    
+    console.warn('CORS blocked origin:', origin);
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // Ensure uploads directory exists
@@ -92,13 +115,17 @@ app.use('/roles', roleRoutes);
 app.use('/teams', teamRoutes);
 app.use('/permissions', permissionRoutes);
 
-// Error handling middleware
+// Error handling
 app.use((err, req, res, next) => {
+  if (err.message === 'Not allowed by CORS') {
+    return res.status(403).json({ 
+      error: 'CORS Error',
+      message: 'Origin not allowed',
+      allowedOrigins: allowedOrigins
+    });
+  }
   console.error(err.stack);
-  res.status(500).json({ 
-    error: 'Internal Server Error',
-    message: err.message
-  });
+  res.status(500).json({ error: 'Internal Server Error' });
 });
 
 module.exports = app;
