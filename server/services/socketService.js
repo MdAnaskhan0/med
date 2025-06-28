@@ -10,35 +10,42 @@ const init = (server) => {
     'http://192.168.111.140:5173',
     'http://192.168.111.140:5174',
     'https://movement-med.vercel.app',
+    'https://www.movement-med.vercel.app', // Added www variant
     'https://med-admin-khaki.vercel.app',
     'https://med-7bj4.onrender.com'
   ];
 
   io = new Server(server, {
     cors: {
-      origin: allowedOrigins,
+      origin: function (origin, callback) {
+        // Allow requests with no origin
+        if (!origin) return callback(null, true);
+        
+        // Normalize origin
+        const normalizedOrigin = origin.endsWith('/') ? origin.slice(0, -1) : origin;
+        
+        if (allowedOrigins.some(allowed => {
+          return normalizedOrigin === allowed || 
+                 normalizedOrigin === allowed.replace('https://', 'https://www.');
+        })) {
+          return callback(null, true);
+        }
+        
+        console.warn('Socket.IO CORS blocked origin:', origin);
+        callback(new Error('Not allowed by CORS'));
+      },
       methods: ['GET', 'POST'],
       credentials: true,
       allowedHeaders: ['Content-Type', 'Authorization']
     },
     transports: ['websocket', 'polling'],
-    allowEIO3: true,
-    pingTimeout: 60000,
-    pingInterval: 25000
+    allowEIO3: true
   });
 
   // Special handling for Engine.IO CORS
-  io.engine.on('initial_headers', (headers, req) => {
-    const origin = req.headers.origin;
-    if (origin && allowedOrigins.includes(origin)) {
-      headers['Access-Control-Allow-Origin'] = origin;
-      headers['Access-Control-Allow-Credentials'] = 'true';
-    }
-  });
-
   io.engine.on('headers', (headers, req) => {
     const origin = req.headers.origin;
-    if (origin && allowedOrigins.includes(origin)) {
+    if (origin && allowedOrigins.some(allowed => origin.startsWith(allowed))) {
       headers['Access-Control-Allow-Origin'] = origin;
       headers['Access-Control-Allow-Credentials'] = 'true';
     }
