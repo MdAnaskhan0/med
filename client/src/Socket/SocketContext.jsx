@@ -7,6 +7,7 @@ export const SocketProvider = ({ children }) => {
   const socketRef = useRef(null);
   const [isConnected, setIsConnected] = useState(false);
   const [messages, setMessages] = useState({});
+  const [currentTeam, setCurrentTeam] = useState(null);
 
   useEffect(() => {
     // Initialize connection
@@ -18,6 +19,10 @@ export const SocketProvider = ({ children }) => {
     // Connection events
     socketRef.current.on('connect', () => {
       setIsConnected(true);
+      // Rejoin current team if connection was lost
+      if (currentTeam) {
+        socketRef.current.emit('joinTeam', currentTeam);
+      }
     });
 
     socketRef.current.on('disconnect', () => {
@@ -28,14 +33,17 @@ export const SocketProvider = ({ children }) => {
     socketRef.current.on('messageHistory', (history) => {
       if (history?.length > 0) {
         const teamId = history[0].team_id;
-        setMessages(prev => ({ ...prev, [teamId]: history }));
+        setMessages(prev => ({ 
+          ...prev, 
+          [teamId]: history 
+        }));
       }
     });
 
     socketRef.current.on('newMessage', (message) => {
       setMessages(prev => ({
         ...prev,
-        [message.team_id]: [...(prev[message.team_id] || []), message]
+        [message.team_id]: [...(prev[message.team_id] || [], message]
       }));
     });
 
@@ -44,17 +52,17 @@ export const SocketProvider = ({ children }) => {
         socketRef.current.disconnect();
       }
     };
-  }, []);
+  }, [currentTeam]);
 
   const joinTeam = (teamId) => {
-    if (isConnected) {
+    if (isConnected && teamId) {
+      setCurrentTeam(teamId);
       socketRef.current.emit('joinTeam', teamId);
     }
   };
 
   const sendMessage = (messageData) => {
     if (isConnected) {
-      // Basic validation
       if (!messageData.team_id || !messageData.message) {
         console.error('Missing required fields');
         return false;
@@ -70,6 +78,7 @@ export const SocketProvider = ({ children }) => {
   };
 
   const getTeamMessages = (teamId) => {
+    if (!teamId) return [];
     return messages[teamId] || [];
   };
 
