@@ -43,7 +43,7 @@ export const SocketProvider = ({ children }) => {
     socketRef.current.on('newMessage', (message) => {
       setMessages(prev => ({
         ...prev,
-        [message.team_id]: [...(prev[message.team_id] || [], message]
+        [message.team_id]: [...(prev[message.team_id] || []), message]
       }));
     });
 
@@ -67,7 +67,7 @@ export const SocketProvider = ({ children }) => {
         console.error('Missing required fields');
         return false;
       }
-      
+
       socketRef.current.emit('sendMessage', {
         ...messageData,
         sender_name: messageData.sender_name || 'Anonymous'
