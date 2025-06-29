@@ -10,16 +10,13 @@ export const SocketProvider = ({ children }) => {
   const [currentTeam, setCurrentTeam] = useState(null);
 
   useEffect(() => {
-    // Initialize connection
     socketRef.current = io('https://med-7bj4.onrender.com', {
       withCredentials: true,
-      transports: ['websocket', 'polling']
+      transports: ['websocket', 'polling'],
     });
 
-    // Connection events
     socketRef.current.on('connect', () => {
       setIsConnected(true);
-      // Rejoin current team if connection was lost
       if (currentTeam) {
         socketRef.current.emit('joinTeam', currentTeam);
       }
@@ -29,21 +26,20 @@ export const SocketProvider = ({ children }) => {
       setIsConnected(false);
     });
 
-    // Message handling
     socketRef.current.on('messageHistory', (history) => {
       if (history?.length > 0) {
         const teamId = history[0].team_id;
-        setMessages(prev => ({ 
-          ...prev, 
-          [teamId]: history 
+        setMessages((prev) => ({
+          ...prev,
+          [teamId]: history,
         }));
       }
     });
 
     socketRef.current.on('newMessage', (message) => {
-      setMessages(prev => ({
+      setMessages((prev) => ({
         ...prev,
-        [message.team_id]: [...(prev[message.team_id] || []), message]
+        [message.team_id]: [...(prev[message.team_id] || []), message],
       }));
     });
 
@@ -70,7 +66,7 @@ export const SocketProvider = ({ children }) => {
 
       socketRef.current.emit('sendMessage', {
         ...messageData,
-        sender_name: messageData.sender_name || 'Anonymous'
+        sender_name: messageData.sender_name || 'Anonymous',
       });
       return true;
     }
@@ -83,12 +79,14 @@ export const SocketProvider = ({ children }) => {
   };
 
   return (
-    <SocketContext.Provider value={{
-      isConnected,
-      joinTeam,
-      sendMessage,
-      getTeamMessages
-    }}>
+    <SocketContext.Provider
+      value={{
+        isConnected,
+        joinTeam,
+        sendMessage,
+        getTeamMessages,
+      }}
+    >
       {children}
     </SocketContext.Provider>
   );
