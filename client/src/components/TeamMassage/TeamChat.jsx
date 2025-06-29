@@ -5,10 +5,11 @@ import { format } from 'date-fns';
 import { TailSpin } from 'react-loader-spinner';
 import { toast } from 'react-toastify';
 
-const TeamChat = ({ selectedTeam, user }) => {
+const TeamChat = ({ selectedTeam, user, updateUnreadCount }) => {
   const { isConnected, joinTeam, sendMessage, getTeamMessages } = useSocket();
   const [messageText, setMessageText] = useState('');
   const messagesEndRef = useRef(null);
+  const [isSending, setIsSending] = useState(false);
 
   // Get messages for current team
   const messages = getTeamMessages(selectedTeam?.team_id);
@@ -16,29 +17,49 @@ const TeamChat = ({ selectedTeam, user }) => {
   useEffect(() => {
     if (selectedTeam && isConnected) {
       joinTeam(selectedTeam.team_id);
+      // Reset unread count when team is selected
+      updateUnreadCount(selectedTeam.team_id, 0);
     }
-  }, [selectedTeam, isConnected, joinTeam]);
+  }, [selectedTeam, isConnected, joinTeam, updateUnreadCount]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Scroll to bottom when messages change
+    scrollToBottom();
   }, [messages]);
 
-  const handleSend = () => {
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleSend = async () => {
     if (!messageText.trim()) {
       toast.warning('Message cannot be empty');
       return;
     }
 
-    const success = sendMessage({
-      team_id: selectedTeam.team_id,
-      sender_name: user?.name,
-      message: messageText.trim()
-    });
+    if (!selectedTeam) {
+      toast.error('No team selected');
+      return;
+    }
 
-    if (success) {
-      setMessageText('');
-    } else {
+    setIsSending(true);
+    try {
+      const success = sendMessage({
+        team_id: selectedTeam.team_id,
+        sender_name: user?.name,
+        message: messageText.trim()
+      });
+
+      if (success) {
+        setMessageText('');
+      } else {
+        toast.error('Failed to send message');
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
       toast.error('Failed to send message');
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -55,7 +76,7 @@ const TeamChat = ({ selectedTeam, user }) => {
 
     return (
       <div 
-        key={msg.id} 
+        key={`${msg.id}-${index}`} 
         className={`mb-4 flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
       >
         {!isCurrentUser && (
@@ -120,14 +141,18 @@ const TeamChat = ({ selectedTeam, user }) => {
           </div>
           <button
             onClick={handleSend}
-            disabled={!messageText.trim()}
+            disabled={!messageText.trim() || isSending}
             className={`ml-2 p-3 rounded-lg ${
-              messageText.trim()
+              messageText.trim() && !isSending
                 ? 'bg-blue-600 text-white hover:bg-blue-700'
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
             }`}
           >
-            <FaPaperPlane />
+            {isSending ? (
+              <TailSpin color="#ffffff" height={16} width={16} />
+            ) : (
+              <FaPaperPlane />
+            )}
           </button>
         </div>
       </div>
