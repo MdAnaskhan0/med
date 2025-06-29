@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSocket } from '../../context/SocketContext';
+import {useSocket} from '../../Socket/SocketContext';
 import { FaPaperPlane, FaUser, FaSmile } from 'react-icons/fa';
 import { format } from 'date-fns';
 import { TailSpin } from 'react-loader-spinner';
