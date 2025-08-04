@@ -3,6 +3,7 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 
+
 // Route imports
 const adminRoutes = require('./routes/adminRoutes');
 const authRoutes = require('./routes/authRoutes');
@@ -29,7 +30,7 @@ const app = express();
 const allowedOrigins = [
   'http://192.168.111.140:5173',
   'http://192.168.111.140:5174',
-  'https://med-movement.vercel.app', // Your frontend
+  'https://med-movement.vercel.app', 
   'https://med-admin-khaki.vercel.app',
   'https://med-7bj4.onrender.com'
 ];
